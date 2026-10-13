@@ -1,0 +1,37 @@
+﻿name: CD Workflow
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Incrementar versión en README con fecha y hora
+        run: |
+          FECHA_HORA=$(date '+%Y-%m-%d %H:%M:%S')
+          sed -i 's/AppVersion-0/AppVersion-1 ($FECHA_HORA)/g' README.md
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          git commit -am "release: incrementar versión a AppVersion-1 el $FECHA_HORA" || echo "No changes to commit"
+          git push
+
+  validate-prod:
+    runs-on: self-hosted
+    needs: bump-version
+    steps:
+      - name: Validar PROD_TOKEN
+        run: |
+          if [ "${{ secrets.PROD_TOKEN }}" = "${{ vars.LOCAL_PROD_TOKEN }}" ]; then
+            echo "Token de producción válido."
+          else
+            echo "Error: El token de producción no coincide."
+            exit 1
+          fi
